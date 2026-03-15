@@ -13,9 +13,10 @@ export const useLetterStore = defineStore('letter', () => {
   const personalNote    = ref('')
 
   // ── Result state ─────────────────────────────────────────────────────────────
-  const generatedLetter = ref('')
-  const isLoading       = ref(false)
-  const error           = ref(null)
+  const generatedLetter   = ref('')
+  const programAnalysis   = ref(null)
+  const isLoading         = ref(false)
+  const error             = ref(null)
 
   // ── Actions ──────────────────────────────────────────────────────────────────
   async function generate() {
@@ -36,8 +37,9 @@ export const useLetterStore = defineStore('letter', () => {
         personalNote: personalNote.value,
       })
       generatedLetter.value = result.letter
-      if (result.universityName) universityName.value = result.universityName
-      if (result.masterAcronym)  masterAcronym.value  = result.masterAcronym
+      if (result.universityName)  universityName.value  = result.universityName
+      if (result.masterAcronym)   masterAcronym.value   = result.masterAcronym
+      if (result.programAnalysis) programAnalysis.value = result.programAnalysis
     } catch (err) {
       error.value = err.response?.data?.detail ?? 'An unexpected error occurred. Please try again.'
     } finally {
@@ -54,13 +56,14 @@ export const useLetterStore = defineStore('letter', () => {
     textLength.value      = 'medium'
     personalNote.value    = ''
     generatedLetter.value = ''
+    programAnalysis.value = null
     error.value           = null
   }
 
   return {
     cvFile, offerUrl, universityName, masterAcronym,
     language, textLength, personalNote,
-    generatedLetter, isLoading, error,
+    generatedLetter, programAnalysis, isLoading, error,
     generate, reset,
   }
 })

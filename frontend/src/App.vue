@@ -100,8 +100,8 @@
           </div>
         </div>
 
-        <!-- ── Right column: preview ───────────────────────────────────────── -->
-        <div class="card flex flex-col justify-between">
+        <!-- ── Right column: analysis + preview ──────────────────────────── -->
+        <div class="card flex flex-col gap-4">
 
           <!-- Empty state -->
           <div
@@ -114,25 +114,56 @@
                    l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <p class="text-sm text-gray-400">
-              Your generated letter will appear here.
+              Your analysis and letter will appear here.
             </p>
           </div>
 
           <!-- Skeleton loader -->
           <div v-else-if="store.isLoading" class="space-y-3 py-4 animate-pulse">
-            <div v-for="n in 10" :key="n"
+            <div v-for="n in 14" :key="n"
               class="h-3 rounded bg-gray-200"
               :style="{ width: n % 3 === 0 ? '60%' : '100%' }"
             />
           </div>
 
-          <!-- Letter preview -->
-          <LetterPreview
-            v-else
-            :letter="store.generatedLetter"
-            @download-pdf="exportToPdf(pdfFilename)"
-            @download-docx="exportToDocx(pdfFilename)"
-          />
+          <!-- Tabs + content -->
+          <template v-else>
+            <!-- Tab switcher -->
+            <div class="flex rounded-lg border border-gray-200 bg-gray-50 p-1 gap-1">
+              <button
+                class="flex-1 rounded-md py-1.5 text-sm font-medium transition"
+                :class="activeTab === 'analysis'
+                  ? 'bg-white shadow-sm text-gray-900'
+                  : 'text-gray-500 hover:text-gray-700'"
+                @click="activeTab = 'analysis'"
+              >
+                Program Analysis
+              </button>
+              <button
+                class="flex-1 rounded-md py-1.5 text-sm font-medium transition"
+                :class="activeTab === 'letter'
+                  ? 'bg-white shadow-sm text-gray-900'
+                  : 'text-gray-500 hover:text-gray-700'"
+                @click="activeTab = 'letter'"
+              >
+                Letter
+              </button>
+            </div>
+
+            <!-- Analysis tab -->
+            <ProgramAnalysis
+              v-if="activeTab === 'analysis' && store.programAnalysis"
+              :analysis="store.programAnalysis"
+            />
+
+            <!-- Letter tab -->
+            <LetterPreview
+              v-if="activeTab === 'letter'"
+              :letter="store.generatedLetter"
+              @download-pdf="exportToPdf(pdfFilename)"
+              @download-docx="exportToDocx(pdfFilename)"
+            />
+          </template>
         </div>
       </div>
     </div>
@@ -140,10 +171,11 @@
 </template>
 
 <script setup>
-import CvUpload      from '@/components/CvUpload.vue'
-import SettingsPanel from '@/components/SettingsPanel.vue'
-import LetterPreview from '@/components/LetterPreview.vue'
-import { computed } from 'vue'
+import CvUpload        from '@/components/CvUpload.vue'
+import SettingsPanel   from '@/components/SettingsPanel.vue'
+import LetterPreview   from '@/components/LetterPreview.vue'
+import ProgramAnalysis from '@/components/ProgramAnalysis.vue'
+import { computed, ref, watch } from 'vue'
 import { useLetterStore }  from '@/stores/letterStore'
 import { usePdfExport }    from '@/composables/usePdfExport'
 import { useDocxExport }   from '@/composables/useDocxExport'
@@ -151,6 +183,9 @@ import { useDocxExport }   from '@/composables/useDocxExport'
 const store = useLetterStore()
 const { exportToPdf }  = usePdfExport()
 const { exportToDocx } = useDocxExport()
+
+const activeTab = ref('analysis')
+watch(() => store.generatedLetter, () => { activeTab.value = 'analysis' })
 
 // Build a clean filename: "motivation-letter_MIT_MSc-AI" (fallback to default)
 const pdfFilename = computed(() => {

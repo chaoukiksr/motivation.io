@@ -24,9 +24,7 @@ export async function generateLetter({ cvFile, offerUrl, language, textLength, p
   formData.append('text_length', textLength)
   formData.append('personal_note', personalNote)
 
-  const { data } = await api.post('/generate-letter', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+  const { data } = await api.post('/generate-letter', formData)
 
   return data
 }
