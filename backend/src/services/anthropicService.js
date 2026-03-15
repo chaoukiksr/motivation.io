@@ -78,21 +78,23 @@ export async function analyzeOfferFit(cvText, offerText, offerUrl) {
   const message = await client.messages.create({
     model:      'claude-haiku-4-5',
     max_tokens: 1024,
-    system:     'You are a career advisor specialising in master\'s program admissions. Analyse fit between a candidate\'s profile and a program. Reply with a single valid JSON object — no markdown, no code fences, no explanation outside the JSON.',
+    system:     'Tu es un conseiller carrière spécialisé dans les admissions en master. Analyse l\'adéquation entre le profil d\'un candidat et un programme. Réponds avec un seul objet JSON valide — pas de markdown, pas de blocs de code, aucune explication en dehors du JSON.',
     messages:   [{
       role:    'user',
-      content: `Step 1 — Read the candidate's CV carefully and infer their career goals, technical interests, and ambitions from their projects, experience, and any stated objectives.
-Step 2 — Read the master's program offer and understand what it focuses on.
-Step 3 — Score how well the candidate's inferred profile fits the program.
+      content: `Étape 1 — Lis attentivement le CV du candidat et déduis ses objectifs de carrière, intérêts techniques et ambitions à partir de ses projets, expériences et tout objectif déclaré.
+Étape 2 — Lis l'offre du programme de master et comprends sur quoi il est axé.
+Étape 3 — Évalue dans quelle mesure le profil déduit du candidat correspond au programme.
 
-Candidate CV:
+Toutes les valeurs textuelles du JSON doivent être rédigées en français.
+
+CV du candidat :
 ${cvText.slice(0, 4000)}
 
-Master's Program Offer (from ${offerUrl}):
+Offre du programme de master (depuis ${offerUrl}) :
 ${offerText.slice(0, 3000)}
 
-Return ONLY this JSON object with no extra text before or after:
-{"extractedGoals":["inferred goal or interest 1","inferred goal or interest 2"],"overview":"2-3 sentence description of the program and its focus","fitScore":75,"fitSummary":"2-3 sentences explaining the score by connecting the candidate's inferred goals and projects to the program's content","skillsToAcquire":["skill1","skill2"],"keyLearnings":["learning1","learning2"]}`,
+Retourne UNIQUEMENT cet objet JSON, sans texte avant ni après :
+{"extractedGoals":["objectif ou intérêt déduit 1","objectif ou intérêt déduit 2"],"overview":"description en 2-3 phrases du programme et de son orientation","fitScore":75,"fitSummary":"2-3 phrases expliquant le score en reliant les objectifs et projets déduits du candidat au contenu du programme","skillsToAcquire":["compétence1","compétence2"],"keyLearnings":["apprentissage1","apprentissage2"]}`,
     }],
   })
 
