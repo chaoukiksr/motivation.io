@@ -1,4 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { createHash } from 'crypto'
+import { cacheGet, cacheSet } from '../utils/cache.js'
+
+/** 7 days — model results for the same inputs are deterministic */
+const MODEL_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 const client = new Anthropic()  // reads ANTHROPIC_API_KEY from env
 
@@ -51,7 +56,8 @@ ${personalNote ? `Additional instructions from the candidate:\n<notes>\n${person
 Please write the motivation letter now.`
 
   // Stream internally + finalMessage() to avoid HTTP timeouts on long outputs
-  const stream = await client.messages.stream({
+  // Note: .stream() returns a MessageStream synchronously — no await needed here.
+  const stream = client.messages.stream({
     model:      'claude-opus-4-6',
     max_tokens: 2048,
     thinking:   { type: 'adaptive' },
@@ -75,6 +81,19 @@ Please write the motivation letter now.`
  * @returns {Promise<{ overview, fitScore, fitSummary, skillsToAcquire, keyLearnings }>}
  */
 export async function analyzeOfferFit(cvText, offerText, offerUrl) {
+  // Key includes a short hash of the CV so a changed CV busts the cache
+  // while the same CV + same URL always returns the cached analysis.
+  const cvHash   = createHash('sha256').update(cvText).digest('hex').slice(0, 16)
+  const cacheKey = `offerFit:${cvHash}:${offerUrl}`
+  const cached   = cacheGet(cacheKey)
+
+  if (cached !== undefined) {
+    console.log(`[cache] HIT  analyzeOfferFit → ${offerUrl} (cv:${cvHash})`)
+    return cached
+  }
+
+  console.log(`[cache] MISS analyzeOfferFit → ${offerUrl} (cv:${cvHash})`)
+
   const message = await client.messages.create({
     model:      'claude-haiku-4-5',
     max_tokens: 1024,
@@ -106,7 +125,7 @@ Retourne UNIQUEMENT cet objet JSON, sans texte avant ni après :
 
   try {
     const parsed = JSON.parse(cleaned)
-    return {
+    const result = {
       extractedGoals:  parsed.extractedGoals  ?? [],
       overview:        parsed.overview        ?? '',
       fitScore:        parsed.fitScore        ?? 0,
@@ -114,6 +133,8 @@ Retourne UNIQUEMENT cet objet JSON, sans texte avant ni après :
       skillsToAcquire: parsed.skillsToAcquire ?? [],
       keyLearnings:    parsed.keyLearnings    ?? [],
     }
+    cacheSet(cacheKey, result, MODEL_CACHE_TTL_MS)
+    return result
   } catch (e) {
     console.error('[analyzeOfferFit] JSON parse failed:', e.message, '\nRaw:', cleaned)
     return { extractedGoals: [], overview: '', fitScore: 0, fitSummary: '', skillsToAcquire: [], keyLearnings: [] }
@@ -129,6 +150,16 @@ Retourne UNIQUEMENT cet objet JSON, sans texte avant ni après :
  * @returns {Promise<{ universityName: string, masterAcronym: string }>}
  */
 export async function extractProgramInfo(offerText, offerUrl) {
+  const cacheKey = `programInfo:${offerUrl}`
+  const cached   = cacheGet(cacheKey)
+
+  if (cached !== undefined) {
+    console.log(`[cache] HIT  extractProgramInfo → ${offerUrl}`)
+    return cached
+  }
+
+  console.log(`[cache] MISS extractProgramInfo → ${offerUrl}`)
+
   const message = await client.messages.create({
     model:      'claude-haiku-4-5',
     max_tokens: 128,
@@ -154,10 +185,12 @@ Reply with exactly this JSON:
   const raw = message.content.find(b => b.type === 'text')?.text?.trim() ?? '{}'
   try {
     const parsed = JSON.parse(raw)
-    return {
+    const result = {
       universityName: parsed.universityName ?? '',
       masterAcronym:  parsed.masterAcronym  ?? '',
     }
+    cacheSet(cacheKey, result, MODEL_CACHE_TTL_MS)
+    return result
   } catch {
     return { universityName: '', masterAcronym: '' }
   }

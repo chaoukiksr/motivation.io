@@ -1,14 +1,29 @@
 import axios from 'axios'
 import * as cheerio from 'cheerio'
+import { cacheGet, cacheSet } from './cache.js'
+
+/** 7 days — offer pages are stable; re-scraping wastes network + risks rate-limiting */
+const OFFER_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
  * Fetch an offer page and return its visible text content.
+ * Results are cached for 7 days keyed by URL.
  * Falls back to the raw URL string if fetching fails.
  *
  * @param {string} url
  * @returns {Promise<string>}
  */
 export async function scrapeOffer(url) {
+  const cacheKey = `offer:${url}`
+  const cached   = cacheGet(cacheKey)
+
+  if (cached !== undefined) {
+    console.log(`[cache] HIT  scrapeOffer → ${url}`)
+    return cached
+  }
+
+  console.log(`[cache] MISS scrapeOffer → ${url}`)
+
   try {
     const { data: html } = await axios.get(url, {
       timeout: 10_000,
@@ -32,9 +47,15 @@ export async function scrapeOffer(url) {
     }
 
     // Collapse whitespace
-    return text.replace(/\s+/g, ' ').trim().slice(0, 8000)
+    const result = text.replace(/\s+/g, ' ').trim().slice(0, 8000)
+    cacheSet(cacheKey, result, OFFER_TTL_MS)
+    return result
   } catch {
     // If we can't scrape, at least pass the URL so the LLM knows what it is
-    return `Offer URL (could not fetch content): ${url}`
+    const fallback = `Offer URL (could not fetch content): ${url}`
+    // Cache the fallback too — retrying a broken URL every request is wasteful.
+    // TTL is shorter (1 hour) so a temporarily unavailable page gets retried later.
+    cacheSet(cacheKey, fallback, 60 * 60 * 1000)
+    return fallback
   }
 }

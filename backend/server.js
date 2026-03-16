@@ -2,6 +2,7 @@ import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import letterRouter from './src/routes/letter.js'
+import { cacheStats } from './src/utils/cache.js'
 
 const app  = express()
 const PORT = process.env.PORT ?? 8000
@@ -19,6 +20,9 @@ app.use('/', letterRouter)
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => res.json({ status: 'ok' }))
+
+// ── Cache stats (observability) ───────────────────────────────────────────────
+app.get('/cache-stats', (_req, res) => res.json(cacheStats()))
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
