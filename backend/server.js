@@ -1,7 +1,8 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
-import letterRouter from './src/routes/letter.js'
+import letterRouter  from './src/routes/letter.js'
+import profileRouter from './src/routes/profile.js'
 import { cacheStats } from './src/utils/cache.js'
 
 const app  = express()
@@ -17,6 +18,7 @@ app.use(express.json())
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/', letterRouter)
+app.use('/', profileRouter)
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => res.json({ status: 'ok' }))

@@ -4,7 +4,6 @@ import { analyzeOffer, generateLetter } from '@/services/letterService'
 
 export const useLetterStore = defineStore('letter', () => {
   // ── Form state ──────────────────────────────────────────────────────────────
-  const cvFile          = ref(null)
   const offerUrl        = ref('')
   const universityName  = ref('')
   const masterAcronym   = ref('')
@@ -22,16 +21,15 @@ export const useLetterStore = defineStore('letter', () => {
   const isGenerating = ref(false)
   const error        = ref(null)
 
-  // ── Step 1: analyze the offer fit ────────────────────────────────────────────
+  // ── Step 1 ───────────────────────────────────────────────────────────────────
   async function analyze() {
-    if (!cvFile.value || !offerUrl.value) {
-      error.value = 'Please upload your CV and provide the offer URL.'
+    if (!offerUrl.value) {
+      error.value = 'Please provide the offer URL.'
       return
     }
 
-    isAnalyzing.value   = true
-    error.value         = null
-    // Reset previous results when analyzing a new offer
+    isAnalyzing.value     = true
+    error.value           = null
     programAnalysis.value = null
     generatedLetter.value = ''
     universityName.value  = ''
@@ -39,22 +37,22 @@ export const useLetterStore = defineStore('letter', () => {
     tokenLog.value        = null
 
     try {
-      const result = await analyzeOffer({ cvFile: cvFile.value, offerUrl: offerUrl.value })
+      const result = await analyzeOffer({ offerUrl: offerUrl.value })
       if (result.universityName)  universityName.value  = result.universityName
       if (result.masterAcronym)   masterAcronym.value   = result.masterAcronym
       if (result.programAnalysis) programAnalysis.value = result.programAnalysis
       if (result.tokenLog)        tokenLog.value        = result.tokenLog
     } catch (err) {
-      error.value = err.response?.data?.detail ?? 'An unexpected error occurred. Please try again.'
+      error.value = err.response?.data?.detail ?? 'An unexpected error occurred.'
     } finally {
       isAnalyzing.value = false
     }
   }
 
-  // ── Step 2: generate the letter (only if the user likes the offer) ───────────
+  // ── Step 2 ───────────────────────────────────────────────────────────────────
   async function generate() {
-    if (!cvFile.value || !offerUrl.value) {
-      error.value = 'Please upload your CV and provide the offer URL.'
+    if (!offerUrl.value) {
+      error.value = 'Please provide the offer URL.'
       return
     }
 
@@ -64,23 +62,21 @@ export const useLetterStore = defineStore('letter', () => {
 
     try {
       const result = await generateLetter({
-        cvFile:       cvFile.value,
         offerUrl:     offerUrl.value,
         language:     language.value,
         textLength:   textLength.value,
         personalNote: personalNote.value,
       })
       generatedLetter.value = result.letter
-      if (result.tokenLog)  tokenLog.value = result.tokenLog
+      if (result.tokenLog) tokenLog.value = result.tokenLog
     } catch (err) {
-      error.value = err.response?.data?.detail ?? 'An unexpected error occurred. Please try again.'
+      error.value = err.response?.data?.detail ?? 'An unexpected error occurred.'
     } finally {
       isGenerating.value = false
     }
   }
 
   function reset() {
-    cvFile.value          = null
     offerUrl.value        = ''
     universityName.value  = ''
     masterAcronym.value   = ''
@@ -94,7 +90,7 @@ export const useLetterStore = defineStore('letter', () => {
   }
 
   return {
-    cvFile, offerUrl, universityName, masterAcronym,
+    offerUrl, universityName, masterAcronym,
     language, textLength, personalNote,
     programAnalysis, generatedLetter, tokenLog,
     isAnalyzing, isGenerating, error,
