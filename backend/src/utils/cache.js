@@ -77,6 +77,8 @@ export function cacheSet(key, value, ttlMs) {
  * @returns {{ size: number, hits: number, misses: number, hitRate: string }}
  */
 export function cacheStats() {
+  console.log('hello world');
+  
   const total   = _hits + _misses
   const hitRate = total === 0 ? 'n/a' : `${(((_hits / total) * 100)).toFixed(1)}%`
   return { size: _store.size, hits: _hits, misses: _misses, hitRate }
