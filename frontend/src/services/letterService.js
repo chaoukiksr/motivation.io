@@ -6,7 +6,12 @@ const api = axios.create({
   timeout: 120000,
 })
 
-// Attach the Supabase JWT to every request automatically
+// Attach the Supabase JWT to every request.
+//
+// We call supabase.auth.getSession() here rather than reading from the store
+// because this module is imported before Pinia is fully initialised.
+// getSession() reads from localStorage and is synchronous in practice; it only
+// hits the network when the token is within 60 s of expiry (rare).
 api.interceptors.request.use(async (config) => {
   const { data: { session } } = await supabase.auth.getSession()
   if (session?.access_token) {
