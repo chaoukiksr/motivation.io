@@ -24,53 +24,43 @@ const upload = multer({
   },
 })
 
-// POST /api/generate-letter
-router.post('/generate-letter', upload.single('cv'), async (req, res) => {
+// ── Shared validation helper ──────────────────────────────────────────────────
+async function parseCvAndOffer(req, res) {
+  if (!req.file) {
+    res.status(400).json({ detail: 'CV file is required.' })
+    return null
+  }
+  const { offer_url } = req.body
+  if (!offer_url) {
+    res.status(400).json({ detail: 'offer_url is required.' })
+    return null
+  }
+  const cvText = await extractCvText(req.file.buffer, req.file.mimetype)
+  if (!cvText) {
+    res.status(422).json({ detail: 'Could not extract text from the CV file.' })
+    return null
+  }
+  const scrapeResult = await scrapeOffer(offer_url)
+  return { cvText, offerText: scrapeResult.text, offerUrl: offer_url, scrapeFromCache: scrapeResult.fromCache }
+}
+
+// ── POST /analyze-offer ───────────────────────────────────────────────────────
+// Step 1: scrape the offer + run the two cheap Haiku calls.
+// The user reviews the fit score before deciding to generate a letter.
+router.post('/analyze-offer', upload.single('cv'), async (req, res) => {
   try {
-    // ── Validate inputs ──────────────────────────────────────────────────────
-    if (!req.file) {
-      return res.status(400).json({ detail: 'CV file is required.' })
-    }
+    const parsed = await parseCvAndOffer(req, res)
+    if (!parsed) return
 
-    const { offer_url, language = 'English', text_length = 'medium', personal_note = '' } = req.body
+    const { cvText, offerText, offerUrl, scrapeFromCache } = parsed
 
-    if (!offer_url) {
-      return res.status(400).json({ detail: 'offer_url is required.' })
-    }
-
-    // ── Parse CV ─────────────────────────────────────────────────────────────
-    const cvText = await extractCvText(req.file.buffer, req.file.mimetype)
-    if (!cvText) {
-      return res.status(422).json({ detail: 'Could not extract text from the CV file.' })
-    }
-
-    // ── Scrape offer page ─────────────────────────────────────────────────────
-    const scrapeResult = await scrapeOffer(offer_url)
-    const offerText    = scrapeResult.text
-
-    // ── Extract program info + generate letter + analyse fit (in parallel) ───
-    const [letterResult, programInfoResult, fitResult] = await Promise.all([
-      generateMotivationLetter({
-        cvText,
-        offerText,
-        offerUrl:     offer_url,
-        language,
-        textLength:   text_length,
-        personalNote: personal_note,
-      }),
-      extractProgramInfo(offerText, offer_url),
-      analyzeOfferFit(cvText, offerText, offer_url),
+    const [programInfoResult, fitResult] = await Promise.all([
+      extractProgramInfo(offerText, offerUrl),
+      analyzeOfferFit(cvText, offerText, offerUrl),
     ])
 
     const tokenLog = {
-      offerScraping: {
-        fromCache: scrapeResult.fromCache,
-      },
-      letterGeneration: {
-        fromCache:    letterResult.meta.fromCache,
-        inputTokens:  letterResult.meta.inputTokens,
-        outputTokens: letterResult.meta.outputTokens,
-      },
+      offerScraping: { fromCache: scrapeFromCache },
       fitAnalysis: {
         fromCache:    fitResult.meta.fromCache,
         inputTokens:  fitResult.meta.inputTokens,
@@ -84,19 +74,51 @@ router.post('/generate-letter', upload.single('cv'), async (req, res) => {
     }
 
     return res.json({
-      letter:          letterResult.letter,
       ...programInfoResult.data,
       programAnalysis: fitResult.data,
       tokenLog,
     })
   } catch (err) {
-    console.error('[/generate-letter]', err)
+    console.error('[/analyze-offer]', err)
+    if (err.status) return res.status(err.status).json({ detail: err.message })
+    return res.status(500).json({ detail: 'Internal server error.' })
+  }
+})
 
-    // Anthropic SDK errors carry a status code
-    if (err.status) {
-      return res.status(err.status).json({ detail: err.message })
+// ── POST /generate-letter ─────────────────────────────────────────────────────
+// Step 2: generate the motivation letter (Opus only).
+// Offer text is typically already cached from the /analyze-offer call,
+// so scrapeOffer returns immediately from cache.
+router.post('/generate-letter', upload.single('cv'), async (req, res) => {
+  try {
+    const parsed = await parseCvAndOffer(req, res)
+    if (!parsed) return
+
+    const { cvText, offerText, offerUrl, scrapeFromCache } = parsed
+    const { language = 'English', text_length = 'medium', personal_note = '' } = req.body
+
+    const letterResult = await generateMotivationLetter({
+      cvText,
+      offerText,
+      offerUrl:     offerUrl,
+      language,
+      textLength:   text_length,
+      personalNote: personal_note,
+    })
+
+    const tokenLog = {
+      offerScraping: { fromCache: scrapeFromCache },
+      letterGeneration: {
+        fromCache:    letterResult.meta.fromCache,
+        inputTokens:  letterResult.meta.inputTokens,
+        outputTokens: letterResult.meta.outputTokens,
+      },
     }
 
+    return res.json({ letter: letterResult.letter, tokenLog })
+  } catch (err) {
+    console.error('[/generate-letter]', err)
+    if (err.status) return res.status(err.status).json({ detail: err.message })
     return res.status(500).json({ detail: 'Internal server error.' })
   }
 })

@@ -48,10 +48,10 @@
             </div>
           </div>
 
-          <!-- Settings -->
+          <!-- Settings (only relevant for letter generation) -->
           <div class="card">
             <h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
-              Settings
+              Letter Settings
             </h2>
             <SettingsPanel
               :model-value="{ language: store.language, textLength: store.textLength, personalNote: store.personalNote }"
@@ -69,29 +69,47 @@
 
           <!-- Action buttons -->
           <div class="flex gap-3">
+
+            <!-- Step 1: Analyze -->
             <button
               class="btn-primary flex-1 justify-center py-3"
-              :disabled="store.isLoading"
+              :disabled="store.isAnalyzing || store.isGenerating"
+              @click="store.analyze()"
+            >
+              <svg v-if="store.isAnalyzing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+              <svg v-else class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0
+                     0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0
+                     0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              {{ store.isAnalyzing ? 'Analysing…' : 'Analyse Program' }}
+            </button>
+
+            <!-- Step 2: Generate letter (only once analysis is done) -->
+            <button
+              v-if="store.programAnalysis"
+              class="btn-primary flex-1 justify-center py-3"
+              :disabled="store.isGenerating || store.isAnalyzing"
               @click="store.generate()"
             >
-              <svg
-                v-if="store.isLoading"
-                class="h-4 w-4 animate-spin"
-                fill="none" viewBox="0 0 24 24"
-              >
+              <svg v-if="store.isGenerating" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor"
-                  d="M4 12a8 8 0 018-8v8H4z" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
               <svg v-else class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              {{ store.isLoading ? 'Generating…' : 'Generate Letter' }}
+              {{ store.isGenerating ? 'Generating…' : 'Generate Letter' }}
             </button>
 
+            <!-- Reset -->
             <button
-              v-if="store.generatedLetter"
+              v-if="store.programAnalysis || store.generatedLetter"
               class="btn-secondary"
               @click="store.reset()"
             >
@@ -105,7 +123,7 @@
 
           <!-- Empty state -->
           <div
-            v-if="!store.generatedLetter && !store.isLoading"
+            v-if="!store.programAnalysis && !store.isAnalyzing && !store.isGenerating"
             class="flex flex-1 flex-col items-center justify-center gap-3 py-20 text-center"
           >
             <svg class="h-16 w-16 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -114,21 +132,21 @@
                    l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <p class="text-sm text-gray-400">
-              Your analysis and letter will appear here.
+              Analyse a program to see your fit score, then generate your letter.
             </p>
           </div>
 
-          <!-- Skeleton loader -->
-          <div v-else-if="store.isLoading" class="space-y-3 py-4 animate-pulse">
+          <!-- Skeleton loader (analyse or generate in progress) -->
+          <div v-else-if="store.isAnalyzing || store.isGenerating" class="space-y-3 py-4 animate-pulse">
             <div v-for="n in 14" :key="n"
               class="h-3 rounded bg-gray-200"
               :style="{ width: n % 3 === 0 ? '60%' : '100%' }"
             />
           </div>
 
-          <!-- Tabs + content -->
+          <!-- Results -->
           <template v-else>
-            <!-- Tab switcher -->
+            <!-- Tab switcher — only show Letter tab once the letter exists -->
             <div class="flex rounded-lg border border-gray-200 bg-gray-50 p-1 gap-1">
               <button
                 class="flex-1 rounded-md py-1.5 text-sm font-medium transition"
@@ -140,6 +158,7 @@
                 Program Analysis
               </button>
               <button
+                v-if="store.generatedLetter"
                 class="flex-1 rounded-md py-1.5 text-sm font-medium transition"
                 :class="activeTab === 'letter'
                   ? 'bg-white shadow-sm text-gray-900'
@@ -158,7 +177,7 @@
 
             <!-- Letter tab -->
             <LetterPreview
-              v-if="activeTab === 'letter'"
+              v-if="activeTab === 'letter' && store.generatedLetter"
               :letter="store.generatedLetter"
               @download-pdf="exportToPdf(pdfFilename)"
               @download-docx="exportToDocx(pdfFilename)"
@@ -167,7 +186,7 @@
         </div>
       </div>
 
-      <!-- Token log — shown after every generation -->
+      <!-- Token log — shown after every operation -->
       <TokenLog v-if="store.tokenLog" :log="store.tokenLog" />
 
     </div>
@@ -190,7 +209,9 @@ const { exportToPdf }  = usePdfExport()
 const { exportToDocx } = useDocxExport()
 
 const activeTab = ref('analysis')
-watch(() => store.generatedLetter, () => { activeTab.value = 'analysis' })
+
+// Switch to letter tab automatically once the letter arrives
+watch(() => store.generatedLetter, val => { if (val) activeTab.value = 'letter' })
 
 // Build a clean filename: "motivation-letter_MIT_MSc-AI" (fallback to default)
 const pdfFilename = computed(() => {

@@ -16,6 +16,15 @@ const api = axios.create({
  * @param {string} personalNote - Free-text personal notes
  * @returns {Promise<{ letter: string }>}
  */
+export async function analyzeOffer({ cvFile, offerUrl }) {
+  const formData = new FormData()
+  formData.append('cv', cvFile)
+  formData.append('offer_url', offerUrl)
+
+  const { data } = await api.post('/analyze-offer', formData)
+  return data
+}
+
 export async function generateLetter({ cvFile, offerUrl, language, textLength, personalNote }) {
   const formData = new FormData()
   formData.append('cv', cvFile)
@@ -25,6 +34,5 @@ export async function generateLetter({ cvFile, offerUrl, language, textLength, p
   formData.append('personal_note', personalNote)
 
   const { data } = await api.post('/generate-letter', formData)
-
   return data
 }

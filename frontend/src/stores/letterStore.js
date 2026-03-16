@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { generateLetter } from '@/services/letterService'
+import { analyzeOffer, generateLetter } from '@/services/letterService'
 
 export const useLetterStore = defineStore('letter', () => {
   // ── Form state ──────────────────────────────────────────────────────────────
@@ -13,21 +13,54 @@ export const useLetterStore = defineStore('letter', () => {
   const personalNote    = ref('')
 
   // ── Result state ─────────────────────────────────────────────────────────────
-  const generatedLetter   = ref('')
   const programAnalysis   = ref(null)
+  const generatedLetter   = ref('')
   const tokenLog          = ref(null)
-  const isLoading         = ref(false)
-  const error             = ref(null)
 
-  // ── Actions ──────────────────────────────────────────────────────────────────
+  // ── Loading states ───────────────────────────────────────────────────────────
+  const isAnalyzing  = ref(false)
+  const isGenerating = ref(false)
+  const error        = ref(null)
+
+  // ── Step 1: analyze the offer fit ────────────────────────────────────────────
+  async function analyze() {
+    if (!cvFile.value || !offerUrl.value) {
+      error.value = 'Please upload your CV and provide the offer URL.'
+      return
+    }
+
+    isAnalyzing.value   = true
+    error.value         = null
+    // Reset previous results when analyzing a new offer
+    programAnalysis.value = null
+    generatedLetter.value = ''
+    universityName.value  = ''
+    masterAcronym.value   = ''
+    tokenLog.value        = null
+
+    try {
+      const result = await analyzeOffer({ cvFile: cvFile.value, offerUrl: offerUrl.value })
+      if (result.universityName)  universityName.value  = result.universityName
+      if (result.masterAcronym)   masterAcronym.value   = result.masterAcronym
+      if (result.programAnalysis) programAnalysis.value = result.programAnalysis
+      if (result.tokenLog)        tokenLog.value        = result.tokenLog
+    } catch (err) {
+      error.value = err.response?.data?.detail ?? 'An unexpected error occurred. Please try again.'
+    } finally {
+      isAnalyzing.value = false
+    }
+  }
+
+  // ── Step 2: generate the letter (only if the user likes the offer) ───────────
   async function generate() {
     if (!cvFile.value || !offerUrl.value) {
       error.value = 'Please upload your CV and provide the offer URL.'
       return
     }
 
-    isLoading.value = true
-    error.value     = null
+    isGenerating.value = true
+    error.value        = null
+    tokenLog.value     = null
 
     try {
       const result = await generateLetter({
@@ -38,14 +71,11 @@ export const useLetterStore = defineStore('letter', () => {
         personalNote: personalNote.value,
       })
       generatedLetter.value = result.letter
-      if (result.universityName)  universityName.value  = result.universityName
-      if (result.masterAcronym)   masterAcronym.value   = result.masterAcronym
-      if (result.programAnalysis) programAnalysis.value = result.programAnalysis
-      if (result.tokenLog)        tokenLog.value        = result.tokenLog
+      if (result.tokenLog)  tokenLog.value = result.tokenLog
     } catch (err) {
       error.value = err.response?.data?.detail ?? 'An unexpected error occurred. Please try again.'
     } finally {
-      isLoading.value = false
+      isGenerating.value = false
     }
   }
 
@@ -57,8 +87,8 @@ export const useLetterStore = defineStore('letter', () => {
     language.value        = 'English'
     textLength.value      = 'medium'
     personalNote.value    = ''
-    generatedLetter.value = ''
     programAnalysis.value = null
+    generatedLetter.value = ''
     tokenLog.value        = null
     error.value           = null
   }
@@ -66,7 +96,8 @@ export const useLetterStore = defineStore('letter', () => {
   return {
     cvFile, offerUrl, universityName, masterAcronym,
     language, textLength, personalNote,
-    generatedLetter, programAnalysis, tokenLog, isLoading, error,
-    generate, reset,
+    programAnalysis, generatedLetter, tokenLog,
+    isAnalyzing, isGenerating, error,
+    analyze, generate, reset,
   }
 })

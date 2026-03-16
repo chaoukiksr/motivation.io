@@ -57,32 +57,35 @@ const props = defineProps({
   log: { type: Object, required: true },
 })
 
-const rows = computed(() => [
-  {
-    label:        'Offer scraping',
-    fromCache:    props.log.offerScraping?.fromCache ?? false,
-    inputTokens:  null,
-    outputTokens: null,
-  },
-  {
-    label:        'Letter generation (Opus)',
-    fromCache:    props.log.letterGeneration?.fromCache ?? false,
-    inputTokens:  props.log.letterGeneration?.inputTokens  ?? 0,
-    outputTokens: props.log.letterGeneration?.outputTokens ?? 0,
-  },
-  {
-    label:        'Fit analysis (Haiku)',
-    fromCache:    props.log.fitAnalysis?.fromCache ?? false,
-    inputTokens:  props.log.fitAnalysis?.inputTokens  ?? 0,
-    outputTokens: props.log.fitAnalysis?.outputTokens ?? 0,
-  },
-  {
-    label:        'Program info (Haiku)',
-    fromCache:    props.log.programInfo?.fromCache ?? false,
-    inputTokens:  props.log.programInfo?.inputTokens  ?? 0,
-    outputTokens: props.log.programInfo?.outputTokens ?? 0,
-  },
-])
+const rows = computed(() => {
+  const all = [
+    {
+      label:        'Offer scraping',
+      fromCache:    props.log.offerScraping?.fromCache ?? false,
+      inputTokens:  null,
+      outputTokens: null,
+    },
+    props.log.fitAnalysis ? {
+      label:        'Fit analysis (Haiku)',
+      fromCache:    props.log.fitAnalysis.fromCache,
+      inputTokens:  props.log.fitAnalysis.inputTokens,
+      outputTokens: props.log.fitAnalysis.outputTokens,
+    } : null,
+    props.log.programInfo ? {
+      label:        'Program info (Haiku)',
+      fromCache:    props.log.programInfo.fromCache,
+      inputTokens:  props.log.programInfo.inputTokens,
+      outputTokens: props.log.programInfo.outputTokens,
+    } : null,
+    props.log.letterGeneration ? {
+      label:        'Letter generation (Opus)',
+      fromCache:    props.log.letterGeneration.fromCache,
+      inputTokens:  props.log.letterGeneration.inputTokens,
+      outputTokens: props.log.letterGeneration.outputTokens,
+    } : null,
+  ]
+  return all.filter(Boolean)
+})
 
 const totalInput  = computed(() => rows.value.reduce((s, r) => s + (r.inputTokens  ?? 0), 0))
 const totalOutput = computed(() => rows.value.reduce((s, r) => s + (r.outputTokens ?? 0), 0))
