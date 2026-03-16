@@ -55,12 +55,13 @@ ${offerText}
 ${personalNote ? `Additional instructions from the candidate:\n<notes>\n${personalNote}\n</notes>\n` : ''}
 Please write the motivation letter now.`
 
-  // Stream internally + finalMessage() to avoid HTTP timeouts on long outputs
+  // Stream internally to keep the connection alive during generation (~10–20 s).
+  // Extended thinking is intentionally disabled — for creative writing it triggers
+  // 30–90 s of silent reasoning before any output, which causes timeouts.
   // Note: .stream() returns a MessageStream synchronously — no await needed here.
   const stream = client.messages.stream({
     model:      'claude-opus-4-6',
-    max_tokens: 2048,
-    thinking:   { type: 'adaptive' },
+    max_tokens: 1024,   // 500 words ≈ 750 tokens; 1024 gives comfortable headroom
     system:     systemPrompt,
     messages:   [{ role: 'user', content: userMessage }],
   })

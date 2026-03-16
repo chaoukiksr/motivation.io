@@ -6,24 +6,6 @@ import supabaseAdmin from '../utils/supabaseAdmin.js'
 
 const router = Router()
 
-/**
- * Fetch the authenticated user's stored CV text.
- * Writes a 400 response and returns null if missing.
- */
-async function getCvText(userId, res) {
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .select('cv_text')
-    .eq('id', userId)
-    .single()
-
-  if (error || !data?.cv_text) {
-    res.status(400).json({ detail: 'No CV found. Please upload your CV first.' })
-    return null
-  }
-  return data.cv_text
-}
-
 // ── POST /analyze-offer ────────────────────────────────────────────────────────
 // Step 1 — cheap: scrape + 2 Haiku calls.
 // Results are persisted in offer_analyses so the Opus step can reuse offer_text
@@ -33,16 +15,20 @@ router.post('/analyze-offer', requireAuth, async (req, res) => {
     const { offer_url } = req.body
     if (!offer_url) return res.status(400).json({ detail: 'offer_url is required.' })
 
-    const cvText = await getCvText(req.userId, res)
-    if (!cvText) return
+    // Fetch CV + check DB cache in parallel — saves ~200–400 ms vs sequential.
+    const [profileResult, cachedResult] = await Promise.all([
+      supabaseAdmin.from('profiles').select('cv_text').eq('id', req.userId).single(),
+      supabaseAdmin.from('offer_analyses')
+        .select('offer_text, program_info, analysis')
+        .eq('user_id', req.userId)
+        .eq('offer_url', offer_url)
+        .single(),
+    ])
 
-    // ── Check persistent DB cache ────────────────────────────────────────────
-    const { data: cached } = await supabaseAdmin
-      .from('offer_analyses')
-      .select('offer_text, program_info, analysis')
-      .eq('user_id', req.userId)
-      .eq('offer_url', offer_url)
-      .single()
+    const cvText = profileResult.data?.cv_text
+    if (!cvText) return res.status(400).json({ detail: 'No CV found. Please upload your CV first.' })
+
+    const cached = cachedResult.data
 
     if (cached) {
       return res.json({
@@ -108,16 +94,20 @@ router.post('/generate-letter', requireAuth, async (req, res) => {
     const { offer_url, language = 'English', text_length = 'medium', personal_note = '' } = req.body
     if (!offer_url) return res.status(400).json({ detail: 'offer_url is required.' })
 
-    const cvText = await getCvText(req.userId, res)
-    if (!cvText) return
+    // Fetch CV + stored offer text in parallel — saves ~200–400 ms vs sequential.
+    const [profileResult, analysisResult] = await Promise.all([
+      supabaseAdmin.from('profiles').select('cv_text').eq('id', req.userId).single(),
+      supabaseAdmin.from('offer_analyses')
+        .select('offer_text, program_info')
+        .eq('user_id', req.userId)
+        .eq('offer_url', offer_url)
+        .single(),
+    ])
 
-    // Reuse offer_text stored during analyze step — avoids a second scrape
-    const { data: storedAnalysis } = await supabaseAdmin
-      .from('offer_analyses')
-      .select('offer_text, program_info')
-      .eq('user_id', req.userId)
-      .eq('offer_url', offer_url)
-      .single()
+    const cvText = profileResult.data?.cv_text
+    if (!cvText) return res.status(400).json({ detail: 'No CV found. Please upload your CV first.' })
+
+    const storedAnalysis = analysisResult.data
 
     let offerText, offerFromCache
     if (storedAnalysis?.offer_text) {
@@ -139,15 +129,15 @@ router.post('/generate-letter', requireAuth, async (req, res) => {
       personalNote: personal_note,
     })
 
-    // Persist to letter history
-    await supabaseAdmin.from('letters').insert({
+    // Fire-and-forget — user gets their letter immediately, DB write happens async.
+    supabaseAdmin.from('letters').insert({
       user_id:         req.userId,
       offer_url,
       university_name: storedAnalysis?.program_info?.universityName ?? '',
       master_acronym:  storedAnalysis?.program_info?.masterAcronym  ?? '',
       letter_text:     letterResult.letter,
       settings:        { language, text_length, personal_note },
-    })
+    }).then(({ error }) => { if (error) console.error('[/generate-letter] history insert failed:', error) })
 
     return res.json({
       letter: letterResult.letter,
