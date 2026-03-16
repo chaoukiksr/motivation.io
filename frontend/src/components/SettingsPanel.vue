@@ -55,7 +55,7 @@ import { computed } from 'vue'
 const props = defineProps({
   modelValue: {
     type: Object,
-    default: () => ({ language: 'English', textLength: 'medium', personalNote: '' }),
+    default: () => ({ language: 'French', textLength: 'medium', personalNote: '' }),
   },
 })
 const emit = defineEmits(['update:modelValue'])
