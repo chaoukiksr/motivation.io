@@ -166,6 +166,10 @@
           </template>
         </div>
       </div>
+
+      <!-- Token log — shown after every generation -->
+      <TokenLog v-if="store.tokenLog" :log="store.tokenLog" />
+
     </div>
   </div>
 </template>
@@ -175,6 +179,7 @@ import CvUpload        from '@/components/CvUpload.vue'
 import SettingsPanel   from '@/components/SettingsPanel.vue'
 import LetterPreview   from '@/components/LetterPreview.vue'
 import ProgramAnalysis from '@/components/ProgramAnalysis.vue'
+import TokenLog        from '@/components/TokenLog.vue'
 import { computed, ref, watch } from 'vue'
 import { useLetterStore }  from '@/stores/letterStore'
 import { usePdfExport }    from '@/composables/usePdfExport'

@@ -45,10 +45,11 @@ router.post('/generate-letter', upload.single('cv'), async (req, res) => {
     }
 
     // ── Scrape offer page ─────────────────────────────────────────────────────
-    const offerText = await scrapeOffer(offer_url)
+    const scrapeResult = await scrapeOffer(offer_url)
+    const offerText    = scrapeResult.text
 
     // ── Extract program info + generate letter + analyse fit (in parallel) ───
-    const [letter, programInfo, programAnalysis] = await Promise.all([
+    const [letterResult, programInfoResult, fitResult] = await Promise.all([
       generateMotivationLetter({
         cvText,
         offerText,
@@ -61,7 +62,33 @@ router.post('/generate-letter', upload.single('cv'), async (req, res) => {
       analyzeOfferFit(cvText, offerText, offer_url),
     ])
 
-    return res.json({ letter, ...programInfo, programAnalysis })
+    const tokenLog = {
+      offerScraping: {
+        fromCache: scrapeResult.fromCache,
+      },
+      letterGeneration: {
+        fromCache:    letterResult.meta.fromCache,
+        inputTokens:  letterResult.meta.inputTokens,
+        outputTokens: letterResult.meta.outputTokens,
+      },
+      fitAnalysis: {
+        fromCache:    fitResult.meta.fromCache,
+        inputTokens:  fitResult.meta.inputTokens,
+        outputTokens: fitResult.meta.outputTokens,
+      },
+      programInfo: {
+        fromCache:    programInfoResult.meta.fromCache,
+        inputTokens:  programInfoResult.meta.inputTokens,
+        outputTokens: programInfoResult.meta.outputTokens,
+      },
+    }
+
+    return res.json({
+      letter:          letterResult.letter,
+      ...programInfoResult.data,
+      programAnalysis: fitResult.data,
+      tokenLog,
+    })
   } catch (err) {
     console.error('[/generate-letter]', err)
 

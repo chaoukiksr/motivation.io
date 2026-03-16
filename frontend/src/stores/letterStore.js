@@ -15,6 +15,7 @@ export const useLetterStore = defineStore('letter', () => {
   // ── Result state ─────────────────────────────────────────────────────────────
   const generatedLetter   = ref('')
   const programAnalysis   = ref(null)
+  const tokenLog          = ref(null)
   const isLoading         = ref(false)
   const error             = ref(null)
 
@@ -40,6 +41,7 @@ export const useLetterStore = defineStore('letter', () => {
       if (result.universityName)  universityName.value  = result.universityName
       if (result.masterAcronym)   masterAcronym.value   = result.masterAcronym
       if (result.programAnalysis) programAnalysis.value = result.programAnalysis
+      if (result.tokenLog)        tokenLog.value        = result.tokenLog
     } catch (err) {
       error.value = err.response?.data?.detail ?? 'An unexpected error occurred. Please try again.'
     } finally {
@@ -57,13 +59,14 @@ export const useLetterStore = defineStore('letter', () => {
     personalNote.value    = ''
     generatedLetter.value = ''
     programAnalysis.value = null
+    tokenLog.value        = null
     error.value           = null
   }
 
   return {
     cvFile, offerUrl, universityName, masterAcronym,
     language, textLength, personalNote,
-    generatedLetter, programAnalysis, isLoading, error,
+    generatedLetter, programAnalysis, tokenLog, isLoading, error,
     generate, reset,
   }
 })

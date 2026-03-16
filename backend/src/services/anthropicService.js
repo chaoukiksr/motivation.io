@@ -69,7 +69,14 @@ Please write the motivation letter now.`
   const textBlock = response.content.find(block => block.type === 'text')
 
   if (!textBlock) throw new Error('No text content returned by the model.')
-  return textBlock.text.trim()
+  return {
+    letter: textBlock.text.trim(),
+    meta:   {
+      fromCache:    false,
+      inputTokens:  response.usage?.input_tokens  ?? 0,
+      outputTokens: response.usage?.output_tokens ?? 0,
+    },
+  }
 }
 
 /**
@@ -89,7 +96,7 @@ export async function analyzeOfferFit(cvText, offerText, offerUrl) {
 
   if (cached !== undefined) {
     console.log(`[cache] HIT  analyzeOfferFit → ${offerUrl} (cv:${cvHash})`)
-    return cached
+    return { data: cached, meta: { fromCache: true, inputTokens: 0, outputTokens: 0 } }
   }
 
   console.log(`[cache] MISS analyzeOfferFit → ${offerUrl} (cv:${cvHash})`)
@@ -134,10 +141,20 @@ Retourne UNIQUEMENT cet objet JSON, sans texte avant ni après :
       keyLearnings:    parsed.keyLearnings    ?? [],
     }
     cacheSet(cacheKey, result, MODEL_CACHE_TTL_MS)
-    return result
+    return {
+      data: result,
+      meta: {
+        fromCache:    false,
+        inputTokens:  message.usage?.input_tokens  ?? 0,
+        outputTokens: message.usage?.output_tokens ?? 0,
+      },
+    }
   } catch (e) {
     console.error('[analyzeOfferFit] JSON parse failed:', e.message, '\nRaw:', cleaned)
-    return { extractedGoals: [], overview: '', fitScore: 0, fitSummary: '', skillsToAcquire: [], keyLearnings: [] }
+    return {
+      data: { extractedGoals: [], overview: '', fitScore: 0, fitSummary: '', skillsToAcquire: [], keyLearnings: [] },
+      meta: { fromCache: false, inputTokens: 0, outputTokens: 0 },
+    }
   }
 }
 
@@ -155,7 +172,7 @@ export async function extractProgramInfo(offerText, offerUrl) {
 
   if (cached !== undefined) {
     console.log(`[cache] HIT  extractProgramInfo → ${offerUrl}`)
-    return cached
+    return { data: cached, meta: { fromCache: true, inputTokens: 0, outputTokens: 0 } }
   }
 
   console.log(`[cache] MISS extractProgramInfo → ${offerUrl}`)
@@ -190,8 +207,18 @@ Reply with exactly this JSON:
       masterAcronym:  parsed.masterAcronym  ?? '',
     }
     cacheSet(cacheKey, result, MODEL_CACHE_TTL_MS)
-    return result
+    return {
+      data: result,
+      meta: {
+        fromCache:    false,
+        inputTokens:  message.usage?.input_tokens  ?? 0,
+        outputTokens: message.usage?.output_tokens ?? 0,
+      },
+    }
   } catch {
-    return { universityName: '', masterAcronym: '' }
+    return {
+      data: { universityName: '', masterAcronym: '' },
+      meta: { fromCache: false, inputTokens: 0, outputTokens: 0 },
+    }
   }
 }

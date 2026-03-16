@@ -19,7 +19,7 @@ export async function scrapeOffer(url) {
 
   if (cached !== undefined) {
     console.log(`[cache] HIT  scrapeOffer → ${url}`)
-    return cached
+    return { text: cached, fromCache: true }
   }
 
   console.log(`[cache] MISS scrapeOffer → ${url}`)
@@ -49,13 +49,13 @@ export async function scrapeOffer(url) {
     // Collapse whitespace
     const result = text.replace(/\s+/g, ' ').trim().slice(0, 8000)
     cacheSet(cacheKey, result, OFFER_TTL_MS)
-    return result
+    return { text: result, fromCache: false }
   } catch {
     // If we can't scrape, at least pass the URL so the LLM knows what it is
     const fallback = `Offer URL (could not fetch content): ${url}`
     // Cache the fallback too — retrying a broken URL every request is wasteful.
     // TTL is shorter (1 hour) so a temporarily unavailable page gets retried later.
     cacheSet(cacheKey, fallback, 60 * 60 * 1000)
-    return fallback
+    return { text: fallback, fromCache: false }
   }
 }
