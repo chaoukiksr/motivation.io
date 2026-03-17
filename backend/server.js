@@ -13,7 +13,9 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : ['http://localhost:5173', 'https://motivation-io.vercel.app']
 
-app.use(cors({ origin: allowedOrigins }))
+const corsOptions = { origin: allowedOrigins, credentials: true }
+app.options('*', cors(corsOptions))   // handle preflight for all routes
+app.use(cors(corsOptions))
 app.use(express.json())
 
 // ── Routes ────────────────────────────────────────────────────────────────────
