@@ -9,12 +9,17 @@ const app  = express()
 const PORT = process.env.PORT ?? 8000
 
 // ── Middleware ────────────────────────────────────────────────────────────────
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:5173', 'https://motivation-io.vercel.app']
+const ALLOWED_ORIGINS = new Set([
+  'http://localhost:5173',
+  'https://motivation-io.vercel.app',
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : []),
+])
 
-const corsOptions = { origin: allowedOrigins, credentials: true }
-app.options('*', cors(corsOptions))   // handle preflight for all routes
+const corsOptions = {
+  origin: (origin, cb) => cb(null, !origin || ALLOWED_ORIGINS.has(origin)),
+  credentials: true,
+}
+app.options('*', cors(corsOptions))
 app.use(cors(corsOptions))
 app.use(express.json())
 
